@@ -53,13 +53,20 @@ const Dashboard = ({ session }) => {
   }, []);
 
   const buscarListaProjetos = async () => {
-    const { data, error } = await supabase.from('projetos').select('projeto');
+    // 1. Buscamos o código (projeto) e o título (nome)
+    const { data, error } = await supabase.from('projetos').select('projeto, cliente'); 
+    
     if (error) {
       toast.error("Erro ao carregar lista de projetos");
     } else if (data) {
-      const nomesUnicos = [...new Set(data.map(p => p.projeto))];
-      setListaProjetos(nomesUnicos);
-      if (nomesUnicos.length > 0 && !projetoAtivo) setProjetoAtivo(nomesUnicos[0]);
+      // 2. Criamos uma lista de objetos únicos filtrando pelo código do projeto
+      const projetosUnicos = Array.from(new Map(data.map(p => [p.projeto, p])).values());
+      
+      setListaProjetos(projetosUnicos); // Agora salva um array de objetos [{projeto: '123', nome: 'Projeto X'}, ...]
+      
+      if (projetosUnicos.length > 0 && !projetoAtivo) {
+        setProjetoAtivo(projetosUnicos[0].projeto); // O ativo continua sendo o CÓDIGO
+      }
     }
   };
 
@@ -205,6 +212,8 @@ const Dashboard = ({ session }) => {
         </div>
 
           {/* Select sem label flutuante — label integrada ao border */}
+
+          {/* Select com tamanho fixo */}
           <select
             value={projetoAtivo}
             onChange={e => setProjetoAtivo(e.target.value)}
@@ -213,9 +222,17 @@ const Dashboard = ({ session }) => {
               border: '1px solid #2a5298', borderRadius: '6px',
               padding: '7px 10px', fontSize: '13px', cursor: 'pointer',
               height: '34px',
+              width: '180px', /* Define o tamanho fixo (ajuste o 280px como preferir) */
+              textOverflow: 'ellipsis', /* Coloca "..." se o texto for muito grande */
+              whiteSpace: 'nowrap',
+              overflow: 'hidden'
             }}
           >
-            {listaProjetos.map((p, i) => <option key={i} value={p}>{p}</option>)}
+            {listaProjetos.map((p, i) => (
+              <option key={i} value={p.projeto}>
+                {p.cliente || p.projeto} 
+              </option>
+            ))}
           </select>
 
           {/* Menu ⋮ */}
@@ -247,7 +264,12 @@ const Dashboard = ({ session }) => {
 
         {/* ── CENTRO: títulos ──────────────────────────────────────── */}
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#64ffda', lineHeight: 1.2 }}>
+          <div style={
+                      { fontSize: '18px', 
+                        fontWeight: 'bold', 
+                        color: '#64ffda', 
+                        lineHeight: 1.2 }
+                        }>
             {dados?.projeto ? `PROJETO: ${dados.projeto}` : 'SELECIONE UM PROJETO'}
           </div>
           <div style={{ fontSize: '13px', color: '#8892b0' }}>

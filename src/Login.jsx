@@ -23,6 +23,14 @@ const bgStyle = `
     0% { stroke-dashoffset: 400; }
     100% { stroke-dashoffset: 0; }
   }
+  @keyframes fadeSlideUp {
+    0% { opacity: 0; transform: translateY(30px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes button-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
 `;
 
 function AnimatedBackground() {
@@ -177,11 +185,35 @@ export default function Login() {
     setLoading(false);
   };
 
+  // NOVA FUNÇÃO: Recuperação de Senha
+  const handleRecuperarSenha = async (e) => {
+    e.preventDefault(); // Evita que a página recarregue ao clicar no link
+    
+    if (!email) {
+      setMsg({ texto: 'Por favor, preencha o seu e-mail acima para recuperar a senha.', tipo: 'erro' });
+      return;
+    }
+
+    setLoading(true);
+    setMsg({ texto: '', tipo: '' });
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    
+    if (error) {
+      setMsg({ texto: error.message, tipo: 'erro' });
+    } else {
+      setMsg({ texto: 'Instruções de recuperação enviadas para o seu e-mail!', tipo: 'sucesso' });
+    }
+    
+    setLoading(false);
+  };
+
   const inputStyle = {
     width: '100%', boxSizing: 'border-box',
     background: '#0a192f', border: '1px solid #1e3a5f',
     borderRadius: '6px', padding: '10px 12px',
     color: '#e2eaf5', fontSize: '14px', outline: 'none',
+    transition: 'border-color 0.2s',
   };
 
   return (
@@ -193,12 +225,13 @@ export default function Login() {
       {/* Animated background */}
       <AnimatedBackground />
 
-      {/* Login card */}
+      {/* Login card com Animação de Entrada */}
       <div style={{
         position: 'relative', zIndex: 2,
         display: 'flex', borderRadius: '12px', overflow: 'hidden',
         width: '820px', maxWidth: '95vw', minHeight: '520px',
         boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+        animation: 'fadeSlideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
       }}>
 
         {/* LEFT — photo */}
@@ -236,6 +269,8 @@ export default function Login() {
               <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#64ffda', flexShrink: 0 }} />
               <span style={{ fontSize: '13px', fontWeight: 500, color: '#64ffda', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Iniflex Status</span>
             </div>
+            {/* Tagline */}
+            <p style={{ fontSize: '12px', color: '#5a7da0', margin: '8px 0 0', fontWeight: 400 }}>Gestão inteligente de projetos</p>
           </div>
 
           <div style={{ marginBottom: '16px' }}>
@@ -259,12 +294,24 @@ export default function Login() {
               onBlur={e => e.target.style.borderColor = '#1e3a5f'}
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
             />
+            
+            {/* Link "Esqueci minha senha" ATUALIZADO */}
+            <div style={{ textAlign: 'right', marginTop: '6px' }}>
+              <a href="#" onClick={handleRecuperarSenha} style={{ fontSize: '11px', color: '#5a7da0', textDecoration: 'none', transition: 'color 0.2s', cursor: loading ? 'not-allowed' : 'pointer' }} 
+                 onMouseOver={e => !loading && (e.target.style.color = '#64ffda')} 
+                 onMouseOut={e => !loading && (e.target.style.color = '#5a7da0')}>
+                Esqueci minha senha
+              </a>
+            </div>
           </div>
 
+          {/* Botão principal */}
           <button onClick={handleLogin} disabled={loading} style={{
             width: '100%', background: '#1a56db', color: '#fff', border: 'none',
             borderRadius: '6px', padding: '11px', fontSize: '14px', fontWeight: 500,
-            cursor: 'pointer', marginTop: '8px', opacity: loading ? 0.5 : 1,
+            cursor: loading ? 'not-allowed' : 'pointer', marginTop: '8px',
+            animation: loading ? 'button-pulse 1.2s ease-in-out infinite' : 'none',
+            transition: 'background-color 0.2s',
           }}>
             {loading ? 'Aguarde...' : 'Entrar'}
           </button>
@@ -274,11 +321,12 @@ export default function Login() {
           <button onClick={handleCadastro} disabled={loading} style={{
             display: 'block', width: '100%', textAlign: 'center',
             background: 'transparent', border: 'none', color: '#3d6b9b',
-            fontSize: '12px', cursor: 'pointer', padding: '6px 0',
+            fontSize: '12px', cursor: loading ? 'not-allowed' : 'pointer', padding: '6px 0',
           }}>
             Não tem conta? Registar
           </button>
 
+          {/* Mensagens de Erro / Sucesso */}
           {msg.texto && (
             <div style={{
               fontSize: '12px', textAlign: 'center', marginTop: '14px',
