@@ -1,68 +1,296 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
+import logo from './assets/logo.png';
+
+const bgStyle = `
+  @keyframes pulse-h {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.18; }
+  }
+  @keyframes pulse-v {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.12; }
+  }
+  @keyframes dot-blink {
+    0%, 100% { opacity: 0.08; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes travel-h {
+    0% { stroke-dashoffset: 500; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes travel-v {
+    0% { stroke-dashoffset: 400; }
+    100% { stroke-dashoffset: 0; }
+  }
+`;
+
+function AnimatedBackground() {
+  return (
+    <>
+      <style>{bgStyle}</style>
+      <svg
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Horizontal grid lines */}
+        {[120, 240, 360, 480, 600, 720, 840].map((y, i) => (
+          <line
+            key={`h${i}`}
+            x1="0" y1={y} x2="1440" y2={y}
+            stroke="#64ffda" strokeWidth="0.4"
+            style={{ animation: `pulse-h 4s ease-in-out ${i * 0.5}s infinite` }}
+          />
+        ))}
+
+        {/* Vertical grid lines */}
+        {[144, 288, 432, 576, 720, 864, 1008, 1152, 1296].map((x, i) => (
+          <line
+            key={`v${i}`}
+            x1={x} y1="0" x2={x} y2="900"
+            stroke="#1e3a5f" strokeWidth="0.5"
+            style={{ animation: `pulse-v 5s ease-in-out ${i * 0.4}s infinite` }}
+          />
+        ))}
+
+        {/* Traveling data lines — horizontal */}
+        <line
+          x1="0" y1="240" x2="1440" y2="240"
+          stroke="#64ffda" strokeWidth="1.5"
+          strokeDasharray="80 500"
+          style={{ animation: 'travel-h 3.5s linear 0s infinite' }}
+          opacity="0.5"
+        />
+        <line
+          x1="0" y1="600" x2="1440" y2="600"
+          stroke="#1a56db" strokeWidth="1.5"
+          strokeDasharray="50 600"
+          style={{ animation: 'travel-h 5s linear 1.2s infinite' }}
+          opacity="0.45"
+        />
+        <line
+          x1="0" y1="480" x2="1440" y2="480"
+          stroke="#64ffda" strokeWidth="1"
+          strokeDasharray="30 700"
+          style={{ animation: 'travel-h 6s linear 2.5s infinite' }}
+          opacity="0.3"
+        />
+
+        {/* Traveling data lines — vertical */}
+        <line
+          x1="288" y1="0" x2="288" y2="900"
+          stroke="#64ffda" strokeWidth="1"
+          strokeDasharray="50 400"
+          style={{ animation: 'travel-v 4s linear 0.8s infinite' }}
+          opacity="0.4"
+        />
+        <line
+          x1="864" y1="0" x2="864" y2="900"
+          stroke="#1a56db" strokeWidth="1"
+          strokeDasharray="40 450"
+          style={{ animation: 'travel-v 5.5s linear 2s infinite' }}
+          opacity="0.4"
+        />
+
+        {/* Intersection dots */}
+        {[
+          [144, 240, 0.3], [288, 480, 0.8], [432, 360, 1.4],
+          [576, 240, 0.2], [720, 600, 1.8], [864, 120, 0.6],
+          [1008, 480, 1.2], [1152, 360, 2.1], [1296, 720, 0.9],
+          [144, 600, 1.6], [432, 720, 0.4], [1008, 240, 2.4],
+        ].map(([x, y, delay], i) => (
+          <circle
+            key={`d${i}`}
+            cx={x} cy={y} r="2.5"
+            fill={i % 2 === 0 ? '#64ffda' : '#1a56db'}
+            style={{ animation: `dot-blink 3s ease-in-out ${delay}s infinite` }}
+          />
+        ))}
+
+        {/* Mini bar chart — bottom left */}
+        <g opacity="0.2">
+          {[
+            [40, 55, 820], [58, 35, 840], [76, 45, 830],
+            [94, 20, 855], [112, 30, 845], [130, 12, 863],
+            [148, 25, 850],
+          ].map(([x, h, y], i) => (
+            <rect key={`b${i}`} x={x} y={y} width="13" height={h} rx="2"
+              fill={i % 2 === 0 ? '#64ffda' : '#1a56db'} />
+          ))}
+        </g>
+
+        {/* Mini line chart — top right */}
+        <polyline
+          points="1150,100 1190,78 1230,92 1270,55 1310,70 1350,38 1390,52 1430,28"
+          fill="none" stroke="#64ffda" strokeWidth="2"
+          opacity="0.18" strokeLinecap="round" strokeLinejoin="round"
+        />
+        <circle cx="1430" cy="28" r="4" fill="#64ffda" opacity="0.3" />
+
+        {/* KPI tags */}
+        <g opacity="0.18">
+          <rect x="50" y="30" width="90" height="26" rx="4" fill="#1e3a5f" />
+          <text x="95" y="48" textAnchor="middle" fontSize="11" fill="#64ffda" fontFamily="monospace">Sprint 7 ✓</text>
+        </g>
+        <g opacity="0.15">
+          <rect x="1270" y="820" width="90" height="26" rx="4" fill="#1e3a5f" />
+          <text x="1315" y="838" textAnchor="middle" fontSize="11" fill="#64ffda" fontFamily="monospace">+12.4% ↑</text>
+        </g>
+        <g opacity="0.15">
+          <rect x="1270" y="50" width="90" height="26" rx="4" fill="#1e3a5f" />
+          <text x="1315" y="68" textAnchor="middle" fontSize="11" fill="#1a56db" fontFamily="monospace">On Track</text>
+        </g>
+        <g opacity="0.13">
+          <rect x="50" y="840" width="100" height="26" rx="4" fill="#1e3a5f" />
+          <text x="100" y="858" textAnchor="middle" fontSize="11" fill="#1a56db" fontFamily="monospace">3 riscos ativos</text>
+        </g>
+      </svg>
+    </>
+  );
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState({ texto: '', tipo: '' });
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     setLoading(true);
-    setMsg('');
-
+    setMsg({ texto: '', tipo: '' });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMsg(`❌ Erro: ${error.message}`);
+    if (error) setMsg({ texto: error.message, tipo: 'erro' });
     setLoading(false);
   };
 
   const handleCadastro = async () => {
     setLoading(true);
-    setMsg('');
-
+    setMsg({ texto: '', tipo: '' });
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
-      setMsg(`❌ Erro ao registar: ${error.message}`);
+      setMsg({ texto: error.message, tipo: 'erro' });
     } else {
-      setMsg('✅ Sucesso! Agora é só clicar em Entrar.');
+      setMsg({ texto: 'Conta criada! Agora é só entrar.', tipo: 'sucesso' });
     }
     setLoading(false);
   };
 
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    background: '#0a192f', border: '1px solid #1e3a5f',
+    borderRadius: '6px', padding: '10px 12px',
+    color: '#e2eaf5', fontSize: '14px', outline: 'none',
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a192f', color: '#fff' }}>
-      <div style={{ background: '#112240', padding: '40px', borderRadius: '8px', width: '350px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
-        <h2 style={{ textAlign: 'center', color: '#64ffda', marginBottom: '20px' }}>Iniflex Status</h2>
-        
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <input
-            type="email"
-            placeholder="E-mail"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #233554', background: '#0a192f', color: '#fff' }}
-            required
+    <div style={{
+      position: 'relative',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', background: '#0a192f', overflow: 'hidden',
+    }}>
+      {/* Animated background */}
+      <AnimatedBackground />
+
+      {/* Login card */}
+      <div style={{
+        position: 'relative', zIndex: 2,
+        display: 'flex', borderRadius: '12px', overflow: 'hidden',
+        width: '820px', maxWidth: '95vw', minHeight: '520px',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+      }}>
+
+        {/* LEFT — photo */}
+        <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+          <img
+            src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&q=80&auto=format&fit=crop"
+            alt="Escritório"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #233554', background: '#0a192f', color: '#fff' }}
-            required
-          />
-          
-          <button type="submit" disabled={loading} style={{ background: '#2563eb', color: '#fff', padding: '10px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-            {loading ? 'A carregar...' : 'Entrar'}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(135deg, rgba(10,25,47,0.85) 0%, rgba(10,25,47,0.55) 100%)',
+            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '32px',
+          }}>
+            <p style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.12em', color: '#64ffda', textTransform: 'uppercase', margin: '0 0 10px' }}>Gestão de projetos</p>
+            <h2 style={{ fontSize: '22px', fontWeight: 500, color: '#e2eaf5', lineHeight: 1.35, margin: '0 0 8px' }}>Visibilidade total<br />sobre seus projetos</h2>
+            <p style={{ fontSize: '13px', color: '#5a7da0', margin: 0 }}>Acompanhe fases, riscos e progresso em tempo real.</p>
+          </div>
+        </div>
+
+        {/* RIGHT — form */}
+        <div style={{ width: '320px', flexShrink: 0, background: '#112240', padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+            <img
+              src={logo}
+              alt="Iniflex Status"
+              onError={e => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+              style={{ maxWidth: '160px', maxHeight: '60px', objectFit: 'contain', margin: '0 auto', display: 'block' }}
+            />
+            {/* Fallback — shown only if image fails to load */}
+            <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#64ffda', flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: '#64ffda', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Iniflex Status</span>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: '#3d6b9b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>E-mail</label>
+            <input
+              type="email" value={email} placeholder="seu@email.com"
+              onChange={e => setEmail(e.target.value)}
+              style={inputStyle}
+              onFocus={e => e.target.style.borderColor = '#64ffda'}
+              onBlur={e => e.target.style.borderColor = '#1e3a5f'}
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: '#3d6b9b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>Senha</label>
+            <input
+              type="password" value={password} placeholder="••••••••"
+              onChange={e => setPassword(e.target.value)}
+              style={inputStyle}
+              onFocus={e => e.target.style.borderColor = '#64ffda'}
+              onBlur={e => e.target.style.borderColor = '#1e3a5f'}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
+          </div>
+
+          <button onClick={handleLogin} disabled={loading} style={{
+            width: '100%', background: '#1a56db', color: '#fff', border: 'none',
+            borderRadius: '6px', padding: '11px', fontSize: '14px', fontWeight: 500,
+            cursor: 'pointer', marginTop: '8px', opacity: loading ? 0.5 : 1,
+          }}>
+            {loading ? 'Aguarde...' : 'Entrar'}
           </button>
-        </form>
 
-        <button onClick={handleCadastro} disabled={loading} style={{ background: 'transparent', color: '#8892b0', border: 'none', width: '100%', marginTop: '15px', cursor: 'pointer', fontSize: '12px' }}>
-          Não tem conta? Registar
-        </button>
+          <hr style={{ border: 'none', borderTop: '1px solid #1a2f4e', margin: '20px 0' }} />
 
-        {msg && <p style={{ marginTop: '15px', fontSize: '13px', textAlign: 'center', color: msg.includes('❌') ? '#ef4444' : '#10b981' }}>{msg}</p>}
+          <button onClick={handleCadastro} disabled={loading} style={{
+            display: 'block', width: '100%', textAlign: 'center',
+            background: 'transparent', border: 'none', color: '#3d6b9b',
+            fontSize: '12px', cursor: 'pointer', padding: '6px 0',
+          }}>
+            Não tem conta? Registar
+          </button>
+
+          {msg.texto && (
+            <div style={{
+              fontSize: '12px', textAlign: 'center', marginTop: '14px',
+              padding: '8px 12px', borderRadius: '6px',
+              background: msg.tipo === 'erro' ? 'rgba(239,68,68,0.1)' : 'rgba(100,255,218,0.07)',
+              color: msg.tipo === 'erro' ? '#f87171' : '#64ffda',
+              border: `1px solid ${msg.tipo === 'erro' ? 'rgba(239,68,68,0.2)' : 'rgba(100,255,218,0.2)'}`,
+            }}>
+              {msg.texto}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
