@@ -1,0 +1,302 @@
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import './Dashboard.css';
+import { supabase } from '../supabaseClient';
+import toast from 'react-hot-toast';
+
+import PainelProgresso  from './PainelProgresso';
+import PainelGantt      from './PainelGantt';
+import PainelObjetivos  from './PainelObjetivos';
+import Timeline         from './Timeline';
+import MatrizRiscos     from './MatrizRiscos';
+import TabelaAreas      from './TabelaAreas';
+
+const getIniciais = (email = '') => {
+  const partes = email.split('@')[0].split(/[._-]/);
+  return partes.slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?';
+};
+
+const itemStyle = {
+  display: 'flex', alignItems: 'center', gap: '8px',
+  padding: '8px 12px', borderRadius: '6px', cursor: 'pointer',
+  color: '#e2eaf5', fontSize: '13px', background: 'transparent',
+  border: 'none', width: '100%', textAlign: 'left',
+};
+
+const btnStyle = {
+  background: 'transparent', border: '1px solid #233554',
+  color: '#8892b0', borderRadius: '6px', width: '34px', height: '34px',
+  cursor: 'pointer', fontSize: '20px', display: 'flex',
+  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+};
+
+const Dashboard = ({ session }) => {
+  const [listaProjetos,   setListaProjetos]   = useState([]);
+  const [projetoAtivo,    setProjetoAtivo]    = useState('');
+  const [dados,           setDados]           = useState(null);
+  const [carregando,      setCarregando]      = useState(false);
+  const [erro,            setErro]            = useState(null);
+  const [areaSelecionada, setAreaSelecionada] = useState(null);
+  const [menuAberto,      setMenuAberto]      = useState(false);
+  const [avatarAberto,    setAvatarAberto]    = useState(false);
+
+  const menuRef   = useRef(null);
+  const avatarRef = useRef(null);
+  const fileRef   = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current   && !menuRef.current.contains(e.target))   setMenuAberto(false);
+      if (avatarRef.current && !avatarRef.current.contains(e.target)) setAvatarAberto(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const buscarListaProjetos = async () => {
+    const { data, error } = await supabase.from('projetos').select('projeto');
+    if (error) {
+      toast.error("Erro ao carregar lista de projetos");
+    } else if (data) {
+      const nomesUnicos = [...new Set(data.map(p => p.projeto))];
+      setListaProjetos(nomesUnicos);
+      if (nomesUnicos.length > 0 && !projetoAtivo) setProjetoAtivo(nomesUnicos[0]);
+    }
+  };
+
+  useEffect(() => { buscarListaProjetos(); }, []);
+
+  const carregarDadosDashboard = async () => {
+    setCarregando(true);
+    setAreaSelecionada(null);
+    try {
+      const [projRes, fasesRes, riscosRes, areasRes, objRes, progressoRes] = await Promise.all([
+        supabase.from('projetos').select('*').eq('projeto', projetoAtivo).single(),
+        supabase.from('fases').select('*').eq('projeto_vinculo', projetoAtivo),
+        supabase.from('riscos').select('*').eq('projeto_vinculo', projetoAtivo),
+        supabase.from('areas').select('*').eq('projeto_vinculo', projetoAtivo),
+        supabase.from('objetivos').select('*').eq('projeto_vinculo', projetoAtivo),
+        supabase.from('vw_progresso_areas').select('*').eq('projeto_vinculo', projetoAtivo),
+      ]);
+
+      if (projRes.error) throw projRes.error;
+
+      const progressoMap = {};
+      (progressoRes.data || []).forEach(p => { progressoMap[p.area] = p; });
+
+      const areasMescladas = (areasRes.data || []).map(a => ({
+        ...a,
+        progresso: progressoMap[a.area]?.progresso ?? 0,
+        status:    progressoMap[a.area]?.status    ?? a.status,
+      }));
+
+      setDados({
+        ...projRes.data,
+        fases:     fasesRes.data  || [],
+        riscos:    riscosRes.data || [],
+        areas:     areasMescladas,
+        objetivos: objRes.data    || [],
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Não encontramos dados para este projeto.");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => { if (projetoAtivo) carregarDadosDashboard(); }, [projetoAtivo]);
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setMenuAberto(false);
+    const tId = toast.loading("Processando planilha...");
+    const formData = new FormData();
+    formData.append('arquivo', file);
+    formData.append('owner_id', session.user.id);
+    try {
+      const response = await fetch('http://localhost:8000/api/importar', { method: 'POST', body: formData });
+      if (!response.ok) throw new Error("Erro na API");
+      const result = await response.json();
+      toast.success(result.mensagem || "Importado com sucesso!", { id: tId });
+      await buscarListaProjetos();
+      setProjetoAtivo(result.projeto);
+    } catch {
+      toast.error("Erro no servidor Python. Verifique o terminal.", { id: tId });
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const toggleArea = (area) => setAreaSelecionada(prev => prev === area ? null : area);
+
+  const dadosFiltrados = useMemo(() => {
+    if (!dados) return null;
+    if (!areaSelecionada) return dados;
+    return {
+      ...dados,
+      fases:  dados.fases?.filter(i => i.area === areaSelecionada),
+      riscos: dados.riscos?.filter(i => i.area === areaSelecionada),
+      areas:  dados.areas?.filter(i => i.area === areaSelecionada),
+    };
+  }, [dados, areaSelecionada]);
+
+  if (erro) return <div style={{ padding: 20, color: 'red' }}>⚠️ {erro}</div>;
+
+  const iniciais = getIniciais(session?.user?.email);
+  const onHover     = e => e.currentTarget.style.background = 'rgba(100,255,218,0.08)';
+  const offHover    = e => e.currentTarget.style.background = 'transparent';
+  const onHoverRed  = e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
+  const offHoverRed = e => e.currentTarget.style.background = 'transparent';
+
+  return (
+    <div className="db-root">
+
+      {/* ══ HEADER ══════════════════════════════════════════════════ */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',        // alinha tudo no meio vertical
+        padding: '0 20px',
+        background: '#112240',
+        borderBottom: '1px solid #233554',
+        height: '84px',              // altura fixa para estabilidade
+        gap: '16px',
+      }}>
+
+        {/* ── ESQUERDA: select + botões todos na mesma linha ───────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+
+          {/* Avatar */}
+          <div ref={avatarRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => { setAvatarAberto(p => !p); setMenuAberto(false); }}
+              title={session?.user?.email}
+              style={{
+                width: '34px', height: '34px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #2563eb, #64ffda)',
+                border: '2px solid #233554', color: '#fff',
+                fontWeight: 'bold', fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#64ffda'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = '#233554'}
+            >{iniciais}</button>
+
+            {avatarAberto && (
+              <div style={{
+                position: 'absolute', top: '42px', left: 0, zIndex: 300,
+                background: '#112240', border: '1px solid #233554',
+                borderRadius: '8px', padding: '14px',
+                minWidth: '210px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              }}>
+                <div style={{ fontSize: '11px', color: '#5a7da0', marginBottom: '2px' }}>Logado como</div>
+                <div style={{ fontSize: '13px', color: '#e2eaf5', fontWeight: 'bold', wordBreak: 'break-all', marginBottom: '12px' }}>
+                  {session?.user?.email}
+                </div>
+                <button
+                  onClick={() => supabase.auth.signOut()}
+                  style={{ width: '100%', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                  onMouseEnter={onHoverRed} onMouseLeave={offHoverRed}
+                >Sair</button>
+              </div>
+            )}
+          </div>
+        </div>
+
+          {/* Select sem label flutuante — label integrada ao border */}
+          <select
+            value={projetoAtivo}
+            onChange={e => setProjetoAtivo(e.target.value)}
+            style={{
+              background: '#0a192f', color: '#fff',
+              border: '1px solid #2a5298', borderRadius: '6px',
+              padding: '7px 10px', fontSize: '13px', cursor: 'pointer',
+              height: '34px',
+            }}
+          >
+            {listaProjetos.map((p, i) => <option key={i} value={p}>{p}</option>)}
+          </select>
+
+          {/* Menu ⋮ */}
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => { setMenuAberto(p => !p); setAvatarAberto(false); }}
+              style={btnStyle}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#64ffda'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = '#233554'}
+            >⋮</button>
+
+            {menuAberto && (
+              <div style={{
+                position: 'absolute', top: '40px', left: 0, zIndex: 300,
+                background: '#112240', border: '1px solid #233554',
+                borderRadius: '8px', padding: '6px',
+                minWidth: '180px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              }}>
+                <input ref={fileRef} type="file" id="file-up" style={{ display: 'none' }} onChange={handleImport} accept=".xlsx,.xls" />
+                <label htmlFor="file-up" style={itemStyle} onMouseEnter={onHover} onMouseLeave={offHover}>
+                  📥 Importar planilha
+                </label>
+              
+              </div>
+            )}
+          </div>
+
+          
+
+        {/* ── CENTRO: títulos ──────────────────────────────────────── */}
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#64ffda', lineHeight: 1.2 }}>
+            {dados?.projeto ? `PROJETO: ${dados.projeto}` : 'SELECIONE UM PROJETO'}
+          </div>
+          <div style={{ fontSize: '13px', color: '#8892b0' }}>
+            {dados?.cliente ?? '—'} · {new Date().toLocaleDateString('pt-BR')}
+          </div>
+        </div>
+
+        {/* ── DIREITA: resumo ──────────────────────────────────────── */}
+        <div style={{
+          flexShrink: 0,
+          background: 'rgba(100,255,218,0.05)', padding: '8px 16px',
+          borderRadius: '6px', border: '1px solid rgba(100,255,218,0.2)',
+          fontSize: '12px', lineHeight: 1.7,
+        }}>
+          <div style={{ color: '#64ffda', fontWeight: 'bold' }}>RESUMO GERAL</div>
+          <div style={{ color: '#8892b0' }}>Líder: <span style={{ color: '#e2eaf5' }}>{dados?.lider ?? '—'}</span></div>
+          <div style={{ color: '#8892b0' }}>Horas: <span style={{ color: '#e2eaf5' }}>{dados?.horas_utilizada ?? 0} / {dados?.horas_contrato ?? 0}</span></div>
+        </div>
+
+      </div>
+      {/* ═══════════════════════════════════════════════════════════ */}
+
+      {/* CONTEÚDO */}
+      {carregando ? (
+        <div style={{ padding: '100px', textAlign: 'center', color: '#64ffda' }}>Sincronizando dados...</div>
+      ) : dadosFiltrados ? (
+        <div style={{ padding: '20px' }}>
+          <div className="grid-main">
+            <PainelProgresso
+              progresso={dadosFiltrados.progresso}
+              horasUtilizadas={dadosFiltrados.horas_utilizada}
+              horasTotais={dadosFiltrados.horas_contrato}
+            />
+            <PainelGantt     fases={dadosFiltrados.fases} />
+            <PainelObjetivos objetivos={dadosFiltrados.objetivos} />
+          </div>
+          <div className="grid-bottom">
+            <Timeline     fases={dadosFiltrados.fases}   areaSelecionada={areaSelecionada} onToggleArea={toggleArea} />
+            <MatrizRiscos riscos={dadosFiltrados.riscos} areaSelecionada={areaSelecionada} onToggleArea={toggleArea} />
+            <TabelaAreas  areas={dadosFiltrados.areas}   areaSelecionada={areaSelecionada} onToggleArea={toggleArea} />
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', marginTop: '100px', color: '#8892b0' }}>
+          Nenhum projeto encontrado. Faça a importação de uma planilha.
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Dashboard;
