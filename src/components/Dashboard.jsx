@@ -126,7 +126,7 @@ const Dashboard = ({ session }) => {
     formData.append('arquivo', file);
     formData.append('owner_id', session.user.id);
     try {
-      const response = await fetch('https://seu-projeto.vercel.app/api/importar', { method: 'POST', body: formData });
+      const response = await fetch('https://status-executivo-api.vercel.app/api/importar', { method: 'POST', body: formData });
       if (!response.ok) throw new Error("Erro na API");
       const result = await response.json();
       toast.success(result.mensagem || "Importado com sucesso!", { id: tId });
