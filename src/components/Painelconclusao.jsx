@@ -116,10 +116,7 @@ const PainelConclusao = ({
         <Gauge pct={percentualEntrega} cor={corEntrega} label="Entrega por Status" sublabel={`Concl. ${concluidas} · Inic. ${iniciadas} · Pend. ${naoIniciadas}`} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8, fontSize: 10, color: '#8892b0' }}>
-        <span><span style={{ color: '#64ffda' }}>●</span> Concluída = 100 pts</span>
-        <span><span style={{ color: '#f0c040' }}>●</span> Iniciada = 50 pts</span>
-      </div>
+    
 
       <hr style={{ border: 'none', borderTop: '1px solid #233554', margin: '16px 0', width: '100%' }} />
 
