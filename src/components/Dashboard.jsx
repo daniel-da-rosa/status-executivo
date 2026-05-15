@@ -3,8 +3,8 @@ import './Dashboard.css';
 import { supabase } from '../supabaseClient';
 import toast from 'react-hot-toast';
 
-import PainelConclusao  from './PainelConclusao';   // ← substituiu PainelProgresso
-import PainelGantt      from './PainelGantt';
+import PainelConclusao  from './Painelconclusao';   // ← substituiu PainelProgresso
+import PainelGantt      from './Painelgantt';
 import PainelObjetivos  from './PainelObjetivos';
 import Timeline         from './Timeline';
 import MatrizRiscos     from './MatrizRiscos';
