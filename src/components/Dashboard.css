@@ -55,7 +55,13 @@
 }
 
 /* ─── GRIDS ─────────────────────────────────────────────── */
-.grid-main   { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; margin-bottom: 10px; }
+/* Alterado para 2 colunas: o Gantt ganha mais espaço horizontal */
+.grid-main { 
+  display: grid; 
+  grid-template-columns: 1.25fr 1.6fr; 
+  gap: 10px; 
+  margin-bottom: 10px; 
+}
 .grid-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
 /* ─── PANEL ─────────────────────────────────────────────── */

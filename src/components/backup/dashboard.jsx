@@ -3,7 +3,7 @@ import './Dashboard.css';
 import { supabase } from '../supabaseClient';
 import toast from 'react-hot-toast';
 
-import PainelConclusao  from './PainelConclusao';   // ← substituiu PainelProgresso
+import PainelProgresso  from './PainelProgresso';
 import PainelGantt      from './PainelGantt';
 import PainelObjetivos  from './PainelObjetivos';
 import Timeline         from './Timeline';
@@ -35,14 +35,9 @@ const Dashboard = ({ session }) => {
   const [dados,           setDados]           = useState(null);
   const [carregando,      setCarregando]      = useState(false);
   const [erro,            setErro]            = useState(null);
-
-  // ── dois filtros independentes ──────────────────────────────────
   const [areaSelecionada, setAreaSelecionada] = useState(null);
-  const [faseSelecionada, setFaseSelecionada] = useState(null);
-  // ───────────────────────────────────────────────────────────────
-
-  const [menuAberto,  setMenuAberto]  = useState(false);
-  const [avatarAberto, setAvatarAberto] = useState(false);
+  const [menuAberto,      setMenuAberto]      = useState(false);
+  const [avatarAberto,    setAvatarAberto]    = useState(false);
 
   const menuRef   = useRef(null);
   const avatarRef = useRef(null);
@@ -57,27 +52,29 @@ const Dashboard = ({ session }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Lista de projetos ────────────────────────────────────────────
   const buscarListaProjetos = async () => {
-    const { data, error } = await supabase.from('projetos').select('projeto, cliente');
+    // 1. Buscamos o código (projeto) e o título (nome)
+    const { data, error } = await supabase.from('projetos').select('projeto, cliente'); 
+    
     if (error) {
       toast.error("Erro ao carregar lista de projetos");
     } else if (data) {
+      // 2. Criamos uma lista de objetos únicos filtrando pelo código do projeto
       const projetosUnicos = Array.from(new Map(data.map(p => [p.projeto, p])).values());
-      setListaProjetos(projetosUnicos);
+      
+      setListaProjetos(projetosUnicos); // Agora salva um array de objetos [{projeto: '123', nome: 'Projeto X'}, ...]
+      
       if (projetosUnicos.length > 0 && !projetoAtivo) {
-        setProjetoAtivo(projetosUnicos[0].projeto);
+        setProjetoAtivo(projetosUnicos[0].projeto); // O ativo continua sendo o CÓDIGO
       }
     }
   };
 
   useEffect(() => { buscarListaProjetos(); }, []);
 
-  // ── Dados do projeto ─────────────────────────────────────────────
   const carregarDadosDashboard = async () => {
     setCarregando(true);
     setAreaSelecionada(null);
-    setFaseSelecionada(null);
     try {
       const [projRes, fasesRes, riscosRes, areasRes, objRes, progressoRes] = await Promise.all([
         supabase.from('projetos').select('*').eq('projeto', projetoAtivo).single(),
@@ -116,7 +113,6 @@ const Dashboard = ({ session }) => {
 
   useEffect(() => { if (projetoAtivo) carregarDadosDashboard(); }, [projetoAtivo]);
 
-  // ── Import ───────────────────────────────────────────────────────
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -139,91 +135,42 @@ const Dashboard = ({ session }) => {
     }
   };
 
-  // ── Handlers de filtro ───────────────────────────────────────────
-  /**
-   * Selecionar área: limpa a fase selecionada (filtros mutuamente exclusivos).
-   */
-  const toggleArea = (area) => {
-    setAreaSelecionada(prev => prev === area ? null : area);
-    setFaseSelecionada(null); // limpa fase ao escolher área
-  };
+  const toggleArea = (area) => setAreaSelecionada(prev => prev === area ? null : area);
 
-  /**
-   * Selecionar fase: limpa a área selecionada.
-   */
-  const toggleFase = (fase) => {
-    setFaseSelecionada(prev => prev === fase ? null : fase);
-    setAreaSelecionada(null); // limpa área ao escolher fase
-  };
-
-  // ── Dados filtrados ──────────────────────────────────────────────
-  /**
-   * Hierarquia de filtro:
-   *   1. Se faseSelecionada → filtra fases, riscos e áreas pela fase
-   *   2. Se areaSelecionada → filtra fases, riscos e áreas pela área
-   *   3. Sem filtro        → dados completos
-   *
-   * O PainelConclusao e o cabeçalho sempre mostram os dados GLOBAIS do projeto
-   * para não distorcer os indicadores macro.
-   */
   const dadosFiltrados = useMemo(() => {
     if (!dados) return null;
+    if (!areaSelecionada) return dados;
+    return {
+      ...dados,
+      fases:  dados.fases?.filter(i => i.area === areaSelecionada),
+      riscos: dados.riscos?.filter(i => i.area === areaSelecionada),
+      areas:  dados.areas?.filter(i => i.area === areaSelecionada),
+    };
+  }, [dados, areaSelecionada]);
 
-    if (faseSelecionada) {
-      return {
-        ...dados,
-        fases:  dados.fases?.filter(i => i.fase === faseSelecionada),
-        riscos: dados.riscos?.filter(i => i.fase === faseSelecionada),
-        areas:  dados.areas?.filter(i =>
-          // tenta casar pelo campo "fase" da área ou pelo campo "area" das fases filtradas
-          dados.fases
-            ?.filter(f => f.fase === faseSelecionada)
-            .map(f => f.area)
-            .includes(i.area)
-        ),
-      };
-    }
-
-    if (areaSelecionada) {
-      return {
-        ...dados,
-        fases:  dados.fases?.filter(i => i.area === areaSelecionada),
-        riscos: dados.riscos?.filter(i => i.area === areaSelecionada),
-        areas:  dados.areas?.filter(i => i.area === areaSelecionada),
-      };
-    }
-
-    return dados;
-  }, [dados, areaSelecionada, faseSelecionada]);
-
-  // ── Render ───────────────────────────────────────────────────────
   if (erro) return <div style={{ padding: 20, color: 'red' }}>⚠️ {erro}</div>;
 
-  const iniciais    = getIniciais(session?.user?.email);
+  const iniciais = getIniciais(session?.user?.email);
   const onHover     = e => e.currentTarget.style.background = 'rgba(100,255,218,0.08)';
   const offHover    = e => e.currentTarget.style.background = 'transparent';
   const onHoverRed  = e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
   const offHoverRed = e => e.currentTarget.style.background = 'transparent';
-
-  // Badge do filtro ativo (para exibir no header)
-  const filtroAtivo = faseSelecionada
-    ? { tipo: 'Fase', valor: faseSelecionada, limpar: () => setFaseSelecionada(null) }
-    : areaSelecionada
-    ? { tipo: 'Área', valor: areaSelecionada, limpar: () => setAreaSelecionada(null) }
-    : null;
 
   return (
     <div className="db-root">
 
       {/* ══ HEADER ══════════════════════════════════════════════════ */}
       <div style={{
-        display: 'flex', alignItems: 'center',
-        padding: '0 20px', background: '#112240',
+        display: 'flex',
+        alignItems: 'center',        // alinha tudo no meio vertical
+        padding: '0 20px',
+        background: '#112240',
         borderBottom: '1px solid #233554',
-        height: '84px', gap: '16px',
+        height: '84px',              // altura fixa para estabilidade
+        gap: '16px',
       }}>
 
-        {/* Esquerda */}
+        {/* ── ESQUERDA: select + botões todos na mesma linha ───────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
 
           {/* Avatar */}
@@ -262,8 +209,11 @@ const Dashboard = ({ session }) => {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Select de projeto */}
+          {/* Select sem label flutuante — label integrada ao border */}
+
+          {/* Select com tamanho fixo */}
           <select
             value={projetoAtivo}
             onChange={e => setProjetoAtivo(e.target.value)}
@@ -271,12 +221,17 @@ const Dashboard = ({ session }) => {
               background: '#0a192f', color: '#fff',
               border: '1px solid #2a5298', borderRadius: '6px',
               padding: '7px 10px', fontSize: '13px', cursor: 'pointer',
-              height: '34px', width: '180px',
-              textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden',
+              height: '34px',
+              width: '180px', /* Define o tamanho fixo (ajuste o 280px como preferir) */
+              textOverflow: 'ellipsis', /* Coloca "..." se o texto for muito grande */
+              whiteSpace: 'nowrap',
+              overflow: 'hidden'
             }}
           >
             {listaProjetos.map((p, i) => (
-              <option key={i} value={p.projeto}>{p.cliente || p.projeto}</option>
+              <option key={i} value={p.projeto}>
+                {p.cliente || p.projeto} 
+              </option>
             ))}
           </select>
 
@@ -300,40 +255,29 @@ const Dashboard = ({ session }) => {
                 <label htmlFor="file-up" style={itemStyle} onMouseEnter={onHover} onMouseLeave={offHover}>
                   📥 Importar planilha
                 </label>
+              
               </div>
             )}
           </div>
-        </div>
 
-        {/* Centro */}
+          
+
+        {/* ── CENTRO: títulos ──────────────────────────────────────── */}
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#64ffda', lineHeight: 1.2 }}>
+          <div style={
+                      { fontSize: '18px', 
+                        fontWeight: 'bold', 
+                        color: '#64ffda', 
+                        lineHeight: 1.2 }
+                        }>
             {dados?.projeto ? `PROJETO: ${dados.projeto}` : 'SELECIONE UM PROJETO'}
           </div>
-          <div style={{ fontSize: '13px', color: '#8892b0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <span>{dados?.cliente ?? '—'} · {new Date().toLocaleDateString('pt-BR')}</span>
-
-            {/* Badge do filtro ativo */}
-            {filtroAtivo && (
-              <span
-                onClick={filtroAtivo.limpar}
-                title="Clique para limpar o filtro"
-                style={{
-                  background: 'rgba(100,255,218,0.12)',
-                  border: '1px solid rgba(100,255,218,0.35)',
-                  borderRadius: 4, padding: '1px 8px',
-                  fontSize: 11, color: '#64ffda', cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                🔍 {filtroAtivo.tipo}: {filtroAtivo.valor}
-                <span style={{ fontSize: 10, opacity: 0.7 }}>✕</span>
-              </span>
-            )}
+          <div style={{ fontSize: '13px', color: '#8892b0' }}>
+            {dados?.cliente ?? '—'} · {new Date().toLocaleDateString('pt-BR')}
           </div>
         </div>
 
-        {/* Direita — usa sempre dados globais */}
+        {/* ── DIREITA: resumo ──────────────────────────────────────── */}
         <div style={{
           flexShrink: 0,
           background: 'rgba(100,255,218,0.05)', padding: '8px 16px',
@@ -344,6 +288,7 @@ const Dashboard = ({ session }) => {
           <div style={{ color: '#8892b0' }}>Líder: <span style={{ color: '#e2eaf5' }}>{dados?.lider ?? '—'}</span></div>
           <div style={{ color: '#8892b0' }}>Horas: <span style={{ color: '#e2eaf5' }}>{dados?.horas_utilizada ?? 0} / {dados?.horas_contrato ?? 0}</span></div>
         </div>
+
       </div>
       {/* ═══════════════════════════════════════════════════════════ */}
 
@@ -353,40 +298,18 @@ const Dashboard = ({ session }) => {
       ) : dadosFiltrados ? (
         <div style={{ padding: '20px' }}>
           <div className="grid-main">
-            {/*
-              PainelConclusao agora ocupa o lugar de PainelProgresso.
-              Recebe as áreas GLOBAIS (dados.areas) para não distorcer
-              os indicadores macro quando há filtro ativo.
-              As horas também vêm dos dados globais.
-            */}
-            <PainelConclusao
-              dadosGlobais={dados.fases}// para o gauge de conclusão, usamos as fases globais para refletir o progresso real do projeto, mesmo com filtros ativos
-              horasUtilizadas={dados.horas_utilizada ?? 0}
-              horasTotais={dados.horas_contrato ?? 0}
+            <PainelProgresso
+              progresso={dadosFiltrados.progresso}
+              horasUtilizadas={dadosFiltrados.horas_utilizada}
+              horasTotais={dadosFiltrados.horas_contrato}
             />
-            <PainelGantt
-              fases={dados.fases}
-              faseSelecionada={faseSelecionada}
-              onToggleFase={toggleFase}
-            />
-           
+            <PainelGantt     fases={dadosFiltrados.fases} />
+            <PainelObjetivos objetivos={dadosFiltrados.objetivos} />
           </div>
           <div className="grid-bottom">
-            <Timeline
-              fases={dadosFiltrados.fases}
-              areaSelecionada={areaSelecionada}
-              onToggleArea={toggleArea}
-            />
-            <MatrizRiscos
-              riscos={dadosFiltrados.riscos}
-              areaSelecionada={areaSelecionada}
-              onToggleArea={toggleArea}
-            />
-            <TabelaAreas
-              areas={dadosFiltrados.areas}
-              areaSelecionada={areaSelecionada}
-              onToggleArea={toggleArea}
-            />
+            <Timeline     fases={dadosFiltrados.fases}   areaSelecionada={areaSelecionada} onToggleArea={toggleArea} />
+            <MatrizRiscos riscos={dadosFiltrados.riscos} areaSelecionada={areaSelecionada} onToggleArea={toggleArea} />
+            <TabelaAreas  areas={dadosFiltrados.areas}   areaSelecionada={areaSelecionada} onToggleArea={toggleArea} />
           </div>
         </div>
       ) : (
