@@ -346,7 +346,9 @@ const Dashboard = ({ session }) => {
               dadosGlobais={dados.fases}
               horasUtilizadas={dados.horas_utilizada ?? 0}
               horasTotais={dados.horas_contrato ?? 0}
+              objetivos={dadosFiltrados.objetivos}
             />
+          
             <PainelGantt
               fases={dados.fases}
               faseSelecionada={faseSelecionada}
