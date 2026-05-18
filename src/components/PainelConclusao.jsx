@@ -102,7 +102,6 @@ const PainelConclusao = ({
   horasTotais = 0,
   objetivos = []
 }) => {
-  // Estado para controlar qual modal está aberto
   const [modalAberto, setModalAberto] = useState(null);
 
   const pctHoras = useMemo(() => {
@@ -157,9 +156,8 @@ const PainelConclusao = ({
             {listaObjetivos.map((obj, idx) => {
               const iconeConvertido = resolverIcone(obj.icone || obj.icon);
               
-              // Fallback: se não tiver descricao curta, pega a longa e corta
-              const descCurta = obj.descricao_curta || obj.resumo;
-              const descDisplay = descCurta ? descCurta : (obj.descricao?.length > 35 ? obj.descricao.substring(0, 35) + '...' : obj.descricao);
+              // Garante que mostre a curta. Se não existir, avisa.
+              const descCurta = obj.descricao_curta || obj.resumo || '';
 
               return (
                 <div 
@@ -170,15 +168,14 @@ const PainelConclusao = ({
                     background: 'rgba(10, 25, 47, 0.4)', 
                     border: '1px solid #233554', 
                     borderRadius: '6px', 
-                    padding: '8px 4px', 
+                    padding: '10px 6px', 
                     height: '110px',
-                    position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '2px',
-                    cursor: 'pointer', // Indica que é clicável
+                    gap: '4px',
+                    cursor: 'pointer',
                     transition: 'all 0.2s ease-in-out'
                   }}
                   onMouseEnter={e => {
@@ -190,19 +187,18 @@ const PainelConclusao = ({
                     e.currentTarget.style.borderColor = '#233554';
                   }}
                 >
-                  <div style={{ fontSize: '15px', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '18px', marginBottom: '2px' }}>
                     {iconeConvertido}
                   </div>
-                  <div style={{ fontSize: '9px', color: '#e2eaf5', fontWeight: 'bold', lineHeight: '1.2', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: '#e2eaf5', fontWeight: 'bold', lineHeight: '1.2', textAlign: 'center' }}>
                     {obj.objetivo || obj.nome}
                   </div>
-                  <div style={{ fontSize: '8px', color: '#5a7da0', textAlign: 'center', padding: '0 4px' }}>
-                    {descDisplay}
+                  <div style={{ 
+                    fontSize: '9px', color: '#5a7da0', textAlign: 'center', 
+                    display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' 
+                  }}>
+                    {descCurta}
                   </div>
-                  
-                  {String(obj.status || '').toLowerCase().includes('conclu') && (
-                    <div style={{ position: 'absolute', top: '4px', right: '6px', color: '#64ffda', fontSize: '10px' }}>✓</div>
-                  )}
                 </div>
               );
             })}
@@ -215,6 +211,7 @@ const PainelConclusao = ({
         const obj = listaObjetivos[modalAberto];
         const icone = resolverIcone(obj.icone || obj.icon);
         const nome = obj.objetivo || obj.nome || 'Objetivo';
+        const descCurta = obj.descricao_curta || obj.resumo || '';
         const descCompleta = obj.descricao || obj.meta || 'Sem descrição detalhada.';
 
         return (
@@ -234,7 +231,7 @@ const PainelConclusao = ({
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '28px' }}>{icone}</span>
-                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#e2eaf5', lineHeight: 1.3 }}>{nome}</span>
+                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#e2eaf5', lineHeight: 1.3 }}>{nome}</span>
                 </div>
                 <button
                   onClick={() => setModalAberto(null)}
@@ -244,14 +241,20 @@ const PainelConclusao = ({
                 >×</button>
               </div>
 
-              {/* Se tiver a curta, pode mostrar ela em itálico como um subtítulo */}
-              {obj.descricao_curta && (
-                <div style={{ fontSize: '12px', color: '#64ffda', marginBottom: '12px', fontStyle: 'italic' }}>
-                  {obj.descricao_curta}
+              {/* Descrição Curta Repetida em Destaque */}
+              {descCurta && (
+                <div style={{ fontSize: '13px', color: '#64ffda', marginBottom: '16px', fontWeight: '500', fontStyle: 'italic' }}>
+                  "{descCurta}"
                 </div>
               )}
 
-              <p style={{ fontSize: '14px', color: '#a8b2c8', lineHeight: 1.7, margin: '0 0 16px 0', whiteSpace: 'pre-wrap' }}>
+              {/* Título da Descrição Completa */}
+              <div style={{ fontSize: '10px', color: '#5a7da0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', fontWeight: 'bold' }}>
+                Descrição Detalhada
+              </div>
+
+              {/* Texto da Descrição Completa */}
+              <p style={{ fontSize: '14px', color: '#a8b2c8', lineHeight: 1.6, margin: '0 0 20px 0', whiteSpace: 'pre-wrap' }}>
                 {descCompleta}
               </p>
 
