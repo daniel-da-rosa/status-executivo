@@ -3,7 +3,7 @@ import './Dashboard.css';
 import { supabase } from '../supabaseClient';
 import toast from 'react-hot-toast';
 
-import PainelConclusao  from './PainelConclusao';   // ← substituiu PainelProgresso
+import PainelConclusao  from './PainelConclusao';
 import PainelGantt      from './PainelGantt';
 import PainelObjetivos  from './PainelObjetivos';
 import Timeline         from './Timeline';
@@ -79,10 +79,12 @@ const Dashboard = ({ session }) => {
     setAreaSelecionada(null);
     setFaseSelecionada(null);
     try {
-      const [projRes, fasesRes, riscosRes, areasRes, objRes, progressoRes] = await Promise.all([
+      const [projRes, fasesRes, riscosRes, pontosRes, areasRes, objRes, progressoRes] = await Promise.all([
         supabase.from('projetos').select('*').eq('projeto', projetoAtivo).single(),
         supabase.from('fases').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('riscos').select('*').eq('projeto_vinculo', projetoAtivo),
+        // ✅ FIX: busca pontos_atencao separadamente e mescla com riscos
+        supabase.from('pontos_atencao').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('areas').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('objetivos').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('vw_progresso_areas').select('*').eq('projeto_vinculo', projetoAtivo),
@@ -99,10 +101,15 @@ const Dashboard = ({ session }) => {
         status:    progressoMap[a.area]?.status    ?? a.status,
       }));
 
+      // ✅ FIX: marca a origem de cada item para o tooltip diferenciar
+      const riscosComTipo    = (riscosRes.data  || []).map(r => ({ ...r, _tipo: 'risco' }));
+      const pontosComTipo    = (pontosRes.data   || []).map(p => ({ ...p, _tipo: 'ponto_atencao' }));
+
       setDados({
         ...projRes.data,
         fases:     fasesRes.data  || [],
-        riscos:    riscosRes.data || [],
+        // ✅ FIX: riscos agora inclui pontos_atencao
+        riscos:    [...riscosComTipo, ...pontosComTipo],
         areas:     areasMescladas,
         objetivos: objRes.data    || [],
       });
@@ -140,32 +147,17 @@ const Dashboard = ({ session }) => {
   };
 
   // ── Handlers de filtro ───────────────────────────────────────────
-  /**
-   * Selecionar área: limpa a fase selecionada (filtros mutuamente exclusivos).
-   */
   const toggleArea = (area) => {
     setAreaSelecionada(prev => prev === area ? null : area);
-    setFaseSelecionada(null); // limpa fase ao escolher área
+    setFaseSelecionada(null);
   };
 
-  /**
-   * Selecionar fase: limpa a área selecionada.
-   */
   const toggleFase = (fase) => {
     setFaseSelecionada(prev => prev === fase ? null : fase);
-    setAreaSelecionada(null); // limpa área ao escolher fase
+    setAreaSelecionada(null);
   };
 
   // ── Dados filtrados ──────────────────────────────────────────────
-  /**
-   * Hierarquia de filtro:
-   *   1. Se faseSelecionada → filtra fases, riscos e áreas pela fase
-   *   2. Se areaSelecionada → filtra fases, riscos e áreas pela área
-   *   3. Sem filtro        → dados completos
-   *
-   * O PainelConclusao e o cabeçalho sempre mostram os dados GLOBAIS do projeto
-   * para não distorcer os indicadores macro.
-   */
   const dadosFiltrados = useMemo(() => {
     if (!dados) return null;
 
@@ -175,7 +167,6 @@ const Dashboard = ({ session }) => {
         fases:  dados.fases?.filter(i => i.fase === faseSelecionada),
         riscos: dados.riscos?.filter(i => i.fase === faseSelecionada),
         areas:  dados.areas?.filter(i =>
-          // tenta casar pelo campo "fase" da área ou pelo campo "area" das fases filtradas
           dados.fases
             ?.filter(f => f.fase === faseSelecionada)
             .map(f => f.area)
@@ -188,7 +179,7 @@ const Dashboard = ({ session }) => {
       return {
         ...dados,
         fases:  dados.fases?.filter(i => i.area === areaSelecionada),
-        riscos: dados.riscos?.filter(i => i.area === areaSelecionada),
+        riscos: dados.riscos?.filter(i => i.area === areaSelecionada || i.indicado_por_area === areaSelecionada),
         areas:  dados.areas?.filter(i => i.area === areaSelecionada),
       };
     }
@@ -205,7 +196,6 @@ const Dashboard = ({ session }) => {
   const onHoverRed  = e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
   const offHoverRed = e => e.currentTarget.style.background = 'transparent';
 
-  // Badge do filtro ativo (para exibir no header)
   const filtroAtivo = faseSelecionada
     ? { tipo: 'Fase', valor: faseSelecionada, limpar: () => setFaseSelecionada(null) }
     : areaSelecionada
@@ -313,7 +303,6 @@ const Dashboard = ({ session }) => {
           <div style={{ fontSize: '13px', color: '#8892b0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <span>{dados?.cliente ?? '—'} · {new Date().toLocaleDateString('pt-BR')}</span>
 
-            {/* Badge do filtro ativo */}
             {filtroAtivo && (
               <span
                 onClick={filtroAtivo.limpar}
@@ -353,14 +342,8 @@ const Dashboard = ({ session }) => {
       ) : dadosFiltrados ? (
         <div style={{ padding: '20px' }}>
           <div className="grid-main">
-            {/*
-              PainelConclusao agora ocupa o lugar de PainelProgresso.
-              Recebe as áreas GLOBAIS (dados.areas) para não distorcer
-              os indicadores macro quando há filtro ativo.
-              As horas também vêm dos dados globais.
-            */}
             <PainelConclusao
-              dadosGlobais={dados.fases}// para o gauge de conclusão, usamos as fases globais para refletir o progresso real do projeto, mesmo com filtros ativos
+              dadosGlobais={dados.fases}
               horasUtilizadas={dados.horas_utilizada ?? 0}
               horasTotais={dados.horas_contrato ?? 0}
             />
@@ -369,7 +352,6 @@ const Dashboard = ({ session }) => {
               faseSelecionada={faseSelecionada}
               onToggleFase={toggleFase}
             />
-           
           </div>
           <div className="grid-bottom">
             <Timeline
