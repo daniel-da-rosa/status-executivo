@@ -78,7 +78,7 @@ const Timeline = ({ fases, areaSelecionada, onToggleArea }) => {
   };
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+    <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
       
       <div>
         <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
