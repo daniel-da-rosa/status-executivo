@@ -61,6 +61,7 @@
   grid-template-columns: 1.25fr 1.6fr; 
   gap: 10px; 
   margin-bottom: 10px; 
+  align-items: start;
 }
 .grid-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 

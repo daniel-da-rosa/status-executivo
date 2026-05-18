@@ -107,7 +107,7 @@ const PainelConclusao = ({
   const listaObjetivos = objetivos && objetivos.length > 0 ? objetivos : OBJETIVOS_MOCK;
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="panel-title">📊 INDICADORES E OBJETIVOS</div>
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'flex-start', marginTop: 4 }}>
@@ -127,7 +127,8 @@ const PainelConclusao = ({
             background: 'rgba(10, 25, 47, 0.4)', 
             border: '1px solid #233554', 
             borderRadius: '6px', 
-            padding: '8px 4px', // Padding reduzido
+            padding: '8px 4px', 
+            height: '110px',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
