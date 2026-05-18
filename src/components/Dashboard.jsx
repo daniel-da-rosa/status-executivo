@@ -357,7 +357,7 @@ const Dashboard = ({ session }) => {
           </div>
           <div className="grid-bottom">
             <Timeline
-              fases={dadosFiltrados.fases}
+              fases={dados?.fases || []}
               areaSelecionada={areaSelecionada}
               onToggleArea={toggleArea}
             />

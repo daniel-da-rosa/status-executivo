@@ -61,12 +61,15 @@
   grid-template-columns: 1.25fr 1.6fr; 
   gap: 10px; 
   margin-bottom: 10px; 
-  align-items: start;
+  align-items: stretch;
 }
 .grid-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
 /* ─── PANEL ─────────────────────────────────────────────── */
 .panel {
+ 
+  display: flex;
+  flex-direction: column;
   background: #0f2544;
   border: 1px solid #1e4080;
   border-radius: 10px;

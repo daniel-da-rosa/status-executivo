@@ -136,7 +136,7 @@ const PainelConclusao = ({
 
   return (
     <>
-      <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="panel" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div className="panel-title">📊 INDICADORES E OBJETIVOS</div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'flex-start', marginTop: 4 }}>
