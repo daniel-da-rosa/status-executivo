@@ -10,8 +10,18 @@ const ORDEM_FASES = [
   'ENCERRAMENTO',
 ];
 
-// FUNÇÃO BLINDADA: Remove todos os espaços e padroniza para evitar erros do Excel
 const formatarChave = (texto) => String(texto || '').replace(/\s+/g, '').toUpperCase();
+
+// ── NOVA FUNÇÃO: Formata "2026-06-15 00:00:00" para "15/06/2026" ──
+const formatarDataBR = (dataStr) => {
+  if (!dataStr) return '';
+  const dataApenas = String(dataStr).split(' ')[0].split('T')[0]; 
+  const partes = dataApenas.split('-');
+  if (partes.length === 3) {
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  }
+  return dataStr;
+};
 
 const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
   const faseAgrupada = React.useMemo(() => {
@@ -20,7 +30,6 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
 
     if (listaFases.length === 0 && listaCrono.length === 0) return [];
 
-    // 1. DICIONÁRIO DE TAREFAS (Avanço)
     const progressoMap = {};
     listaFases.forEach((f) => {
       const nomeOriginal = f.fase ? String(f.fase).trim().toUpperCase() : 'SEM FASE';
@@ -38,7 +47,6 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
       }
     });
 
-    // 2. DICIONÁRIO DO CRONOGRAMA (Datas Oficiais blindadas contra espaços)
     const cronoMap = {};
     listaCrono.forEach((c) => {
       if (c.etapa) {
@@ -50,31 +58,26 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
       }
     });
 
-    // 3. JUNTA AS CHAVES USANDO A BLINDAGEM
     const todasAsFasesSet = new Set([...Object.keys(progressoMap), ...Object.keys(cronoMap)]);
     
-    // Garante que a ordem oficial seja respeitada
     const fasesOrdenadas = ORDEM_FASES.map(formatarChave).filter(chave => todasAsFasesSet.has(chave));
     const fasesExtras = Array.from(todasAsFasesSet).filter(chave => !ORDEM_FASES.map(formatarChave).includes(chave));
     const chavesFinais = [...fasesOrdenadas, ...fasesExtras];
 
-    // 4. MONTA O RESULTADO FINAL
     return chavesFinais.map((chave) => {
       const { total, concluidas, nomeExibicao } = progressoMap[chave] || { total: 0, concluidas: 0, nomeExibicao: chave };
       const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
 
       const datas = cronoMap[chave] || {};
-      const dataInicio = datas.inicio ? new Date(datas.inicio) : null;
-      const dataFim = datas.fim ? new Date(datas.fim) : null;
-
-      const periodo = dataInicio && !isNaN(dataInicio) && dataFim && !isNaN(dataFim)
-        ? `${dataInicio.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} – ${dataFim.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}`
-        : '';
+      
+      // ── APLICA A FORMATAÇÃO DE DATAS EXATAS ──
+      const inicioFormatado = formatarDataBR(datas.inicio);
+      const fimFormatado = formatarDataBR(datas.fim);
+      const periodo = inicioFormatado && fimFormatado ? `${inicioFormatado} - ${fimFormatado}` : '';
 
       const cor   = pct === 100 ? '#2ecc71' : pct > 0 ? '#3498db' : '#e67e22';
       const icone = pct === 100 ? '✓' : pct > 0 ? '◑' : '';
 
-      // Tenta recuperar o nome bonito original, senão usa a chave
       const nomeFinal = ORDEM_FASES.find(of => formatarChave(of) === chave) || nomeExibicao;
 
       return { nome: nomeFinal, periodo, largura: Math.max(pct, 4), cor, icone, pct, chave };
@@ -148,10 +151,8 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
                 }}
               >
                 
-                {/* ── LÓGICA DE POSIÇÃO DINÂMICA E SEGURA ── */}
                 {fase.pct >= 45 ? (
                   <>
-                    {/* MAIOR QUE 45%: Prazo na ESQUERDA, Percentual empurrado para a DIREITA */}
                     <span style={{ fontSize: '11px', fontWeight: 500, color: '#fff', whiteSpace: 'nowrap' }}>
                       {fase.periodo}
                     </span>
@@ -161,7 +162,6 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
                   </>
                 ) : (
                   <>
-                    {/* MENOR QUE 45%: Percentual DENTRO na ESQUERDA, Prazo FORA na DIREITA */}
                     <span style={{ fontWeight: 600, fontSize: '12px', whiteSpace: 'nowrap', zIndex: 2 }}>
                       {fase.icone} {fase.pct}%
                     </span>
