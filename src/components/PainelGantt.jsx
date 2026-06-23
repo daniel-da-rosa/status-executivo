@@ -1,25 +1,26 @@
 import React from 'react';
 
-const ORDEM_FASES = [
-  '1-LEVANTAMENTO',
-  '2-CADASTROS',
-  '3-ETAPA I',
-  '4-ETAPA II',
-  '5-ETAPA III',
-  'ENCERRAMENTO',
-];
-
 const formatarChave = (texto) => String(texto || '').replace(/\s+/g, '').toUpperCase();
 
-// ── NOVA FUNÇÃO: Formata "2026-06-15 00:00:00" para "15/06/2026" ──
-const formatarDataBR = (dataStr) => {
-  if (!dataStr) return '';
-  const dataApenas = String(dataStr).split(' ')[0].split('T')[0]; 
+// ── FUNÇÃO BLINDADA PARA FORMATAR DATA (DD/MM/YYYY) ──
+const formatarDataBR = (dataInput) => {
+  if (!dataInput) return '';
+
+  if (dataInput instanceof Date) {
+    const dia = String(dataInput.getUTCDate()).padStart(2, '0');
+    const mes = String(dataInput.getUTCMonth() + 1).padStart(2, '0');
+    const ano = dataInput.getUTCFullYear();
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  const dataApenas = String(dataInput).split(' ')[0].split('T')[0]; 
   const partes = dataApenas.split('-');
+  
   if (partes.length === 3) {
     return `${partes[2]}/${partes[1]}/${partes[0]}`;
   }
-  return dataStr;
+  
+  return String(dataInput);
 };
 
 const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
@@ -27,17 +28,18 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
     const listaFases = fases || [];
     const listaCrono = cronograma || [];
 
-    if (listaFases.length === 0 && listaCrono.length === 0) return [];
+    if (listaCrono.length === 0) return [];
 
+    // 1. DICIONÁRIO DE TAREFAS (Avanço real vindo da aba ATIVIDADE)
     const progressoMap = {};
     listaFases.forEach((f) => {
-      const nomeOriginal = f.fase ? String(f.fase).trim().toUpperCase() : 'SEM FASE';
-      if (nomeOriginal === 'NÃO PLANEJADO') return;
+      const nomeOriginal = f.fase ? String(f.fase).trim().toUpperCase() : '';
+      if (!nomeOriginal || nomeOriginal === 'NÃO PLANEJADO') return;
 
       const chaveBlindada = formatarChave(nomeOriginal);
 
       if (!progressoMap[chaveBlindada]) {
-        progressoMap[chaveBlindada] = { total: 0, concluidas: 0, nomeExibicao: nomeOriginal };
+        progressoMap[chaveBlindada] = { total: 0, concluidas: 0 };
       }
 
       progressoMap[chaveBlindada].total += 1;
@@ -46,40 +48,33 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
       }
     });
 
-    const cronoMap = {};
-    listaCrono.forEach((c) => {
-      if (c.etapa) {
-        const chaveBlindada = formatarChave(c.etapa);
-        cronoMap[chaveBlindada] = {
-          inicio: c.data_inicio,
-          fim: c.data_fim
-        };
-      }
-    });
+    // 2. ORDENA O CRONOGRAMA EM ORDEM CRESCENTE (Pela data de início real)
+    const cronogramaOrdenado = [...listaCrono]
+      .filter(c => c && c.etapa)
+      .sort((a, b) => {
+        const dateA = a.data_inicio ? new Date(a.data_inicio) : new Date(0);
+        const dateB = b.data_inicio ? new Date(b.data_inicio) : new Date(0);
+        return dateA - dateB;
+      });
 
-    const todasAsFasesSet = new Set([...Object.keys(progressoMap), ...Object.keys(cronoMap)]);
-    
-    const fasesOrdenadas = ORDEM_FASES.map(formatarChave).filter(chave => todasAsFasesSet.has(chave));
-    const fasesExtras = Array.from(todasAsFasesSet).filter(chave => !ORDEM_FASES.map(formatarChave).includes(chave));
-    const chavesFinais = [...fasesOrdenadas, ...fasesExtras];
+    // 3. MONTA O RESULTADO BASEADO EXCLUSIVAMENTE NAS ETAPAS DO CRONOGRAMA DO BANCO
+    return cronogramaOrdenado.map((c) => {
+      const nomeExibicao = String(c.etapa).trim();
+      const chave = formatarChave(nomeExibicao);
 
-    return chavesFinais.map((chave) => {
-      const { total, concluidas, nomeExibicao } = progressoMap[chave] || { total: 0, concluidas: 0, nomeExibicao: chave };
+      // Cruza o progresso medido pelas tarefas
+      const { total, concluidas } = progressoMap[chave] || { total: 0, concluidas: 0 };
       const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
 
-      const datas = cronoMap[chave] || {};
-      
-      // ── APLICA A FORMATAÇÃO DE DATAS EXATAS ──
-      const inicioFormatado = formatarDataBR(datas.inicio);
-      const fimFormatado = formatarDataBR(datas.fim);
+      // Formata as datas exatas
+      const inicioFormatado = formatarDataBR(c.data_inicio);
+      const fimFormatado = formatarDataBR(c.data_fim);
       const periodo = inicioFormatado && fimFormatado ? `${inicioFormatado} - ${fimFormatado}` : '';
 
       const cor   = pct === 100 ? '#2ecc71' : pct > 0 ? '#3498db' : '#e67e22';
       const icone = pct === 100 ? '✓' : pct > 0 ? '◑' : '';
 
-      const nomeFinal = ORDEM_FASES.find(of => formatarChave(of) === chave) || nomeExibicao;
-
-      return { nome: nomeFinal, periodo, largura: Math.max(pct, 4), cor, icone, pct, chave };
+      return { nome: nomeExibicao, periodo, largura: Math.max(pct, 4), cor, icone, pct, chave };
     });
   }, [fases, cronograma]);
 
