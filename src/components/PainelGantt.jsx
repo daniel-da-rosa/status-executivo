@@ -6,7 +6,6 @@ const ORDEM_FASES = [
   '3-ETAPA I',
   '4-ETAPA II',
   '5-ETAPA III',
-  '6-ETAPA IV',
   'ENCERRAMENTO',
 ];
 
