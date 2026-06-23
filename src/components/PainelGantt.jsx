@@ -10,6 +10,7 @@ const ORDEM_FASES = [
   'ENCERRAMENTO',
 ];
 
+// FUNÇÃO BLINDADA: Remove todos os espaços e padroniza para evitar erros do Excel
 const formatarChave = (texto) => String(texto || '').replace(/\s+/g, '').toUpperCase();
 
 const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
@@ -19,6 +20,7 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
 
     if (listaFases.length === 0 && listaCrono.length === 0) return [];
 
+    // 1. DICIONÁRIO DE TAREFAS (Avanço)
     const progressoMap = {};
     listaFases.forEach((f) => {
       const nomeOriginal = f.fase ? String(f.fase).trim().toUpperCase() : 'SEM FASE';
@@ -36,6 +38,7 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
       }
     });
 
+    // 2. DICIONÁRIO DO CRONOGRAMA (Datas Oficiais blindadas contra espaços)
     const cronoMap = {};
     listaCrono.forEach((c) => {
       if (c.etapa) {
@@ -47,12 +50,15 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
       }
     });
 
+    // 3. JUNTA AS CHAVES USANDO A BLINDAGEM
     const todasAsFasesSet = new Set([...Object.keys(progressoMap), ...Object.keys(cronoMap)]);
     
+    // Garante que a ordem oficial seja respeitada
     const fasesOrdenadas = ORDEM_FASES.map(formatarChave).filter(chave => todasAsFasesSet.has(chave));
     const fasesExtras = Array.from(todasAsFasesSet).filter(chave => !ORDEM_FASES.map(formatarChave).includes(chave));
     const chavesFinais = [...fasesOrdenadas, ...fasesExtras];
 
+    // 4. MONTA O RESULTADO FINAL
     return chavesFinais.map((chave) => {
       const { total, concluidas, nomeExibicao } = progressoMap[chave] || { total: 0, concluidas: 0, nomeExibicao: chave };
       const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
@@ -68,6 +74,7 @@ const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
       const cor   = pct === 100 ? '#2ecc71' : pct > 0 ? '#3498db' : '#e67e22';
       const icone = pct === 100 ? '✓' : pct > 0 ? '◑' : '';
 
+      // Tenta recuperar o nome bonito original, senão usa a chave
       const nomeFinal = ORDEM_FASES.find(of => formatarChave(of) === chave) || nomeExibicao;
 
       return { nome: nomeFinal, periodo, largura: Math.max(pct, 4), cor, icone, pct, chave };

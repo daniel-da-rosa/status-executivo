@@ -79,7 +79,7 @@ const Dashboard = ({ session }) => {
     setAreaSelecionada(null);
     setFaseSelecionada(null);
     try {
-      // ✅ FIX: cronoRes adicionado na Promise.all
+      // ✅ BUSCANDO O CRONOGRAMA JUNTO
       const [projRes, fasesRes, riscosRes, pontosRes, areasRes, objRes, progressoRes, cronoRes] = await Promise.all([
         supabase.from('projetos').select('*').eq('projeto', projetoAtivo).single(),
         supabase.from('fases').select('*').eq('projeto_vinculo', projetoAtivo),
@@ -88,7 +88,7 @@ const Dashboard = ({ session }) => {
         supabase.from('areas').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('objetivos').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('vw_progresso_areas').select('*').eq('projeto_vinculo', projetoAtivo),
-        supabase.from('cronograma').select('*').eq('projeto_vinculo', projetoAtivo), // <--- NOVA BUSCA AQUI
+        supabase.from('cronograma').select('*').eq('projeto_vinculo', projetoAtivo), 
       ]);
 
       if (projRes.error) throw projRes.error;
@@ -111,7 +111,7 @@ const Dashboard = ({ session }) => {
         riscos:     [...riscosComTipo, ...pontosComTipo],
         areas:      areasMescladas,
         objetivos:  objRes.data    || [],
-        cronograma: cronoRes.data  || [], // <--- CRONOGRAMA SALVO NO ESTADO
+        cronograma: cronoRes.data  || [], // ✅ SALVANDO CRONOGRAMA NO ESTADO
       });
     } catch (err) {
       console.error(err);
@@ -349,7 +349,7 @@ const Dashboard = ({ session }) => {
               objetivos={dadosFiltrados.objetivos}
             />
           
-            {/* ✅ FIX: Passando os dados do cronograma para o Gantt */}
+            {/* ✅ PASSANDO OS DADOS DO CRONOGRAMA PARA O COMPONENTE */}
             <PainelGantt
               fases={dados.fases}
               cronograma={dados.cronograma} 
