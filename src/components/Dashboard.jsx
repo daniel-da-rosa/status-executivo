@@ -79,15 +79,16 @@ const Dashboard = ({ session }) => {
     setAreaSelecionada(null);
     setFaseSelecionada(null);
     try {
-      const [projRes, fasesRes, riscosRes, pontosRes, areasRes, objRes, progressoRes] = await Promise.all([
+      // ✅ FIX: cronoRes adicionado na Promise.all
+      const [projRes, fasesRes, riscosRes, pontosRes, areasRes, objRes, progressoRes, cronoRes] = await Promise.all([
         supabase.from('projetos').select('*').eq('projeto', projetoAtivo).single(),
         supabase.from('fases').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('riscos').select('*').eq('projeto_vinculo', projetoAtivo),
-        // ✅ FIX: busca pontos_atencao separadamente e mescla com riscos
         supabase.from('pontos_atencao').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('areas').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('objetivos').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('vw_progresso_areas').select('*').eq('projeto_vinculo', projetoAtivo),
+        supabase.from('cronograma').select('*').eq('projeto_vinculo', projetoAtivo), // <--- NOVA BUSCA AQUI
       ]);
 
       if (projRes.error) throw projRes.error;
@@ -101,17 +102,16 @@ const Dashboard = ({ session }) => {
         status:    progressoMap[a.area]?.status    ?? a.status,
       }));
 
-      // ✅ FIX: marca a origem de cada item para o tooltip diferenciar
       const riscosComTipo    = (riscosRes.data  || []).map(r => ({ ...r, _tipo: 'risco' }));
       const pontosComTipo    = (pontosRes.data   || []).map(p => ({ ...p, _tipo: 'ponto_atencao' }));
 
       setDados({
         ...projRes.data,
-        fases:     fasesRes.data  || [],
-        // ✅ FIX: riscos agora inclui pontos_atencao
-        riscos:    [...riscosComTipo, ...pontosComTipo],
-        areas:     areasMescladas,
-        objetivos: objRes.data    || [],
+        fases:      fasesRes.data  || [],
+        riscos:     [...riscosComTipo, ...pontosComTipo],
+        areas:      areasMescladas,
+        objetivos:  objRes.data    || [],
+        cronograma: cronoRes.data  || [], // <--- CRONOGRAMA SALVO NO ESTADO
       });
     } catch (err) {
       console.error(err);
@@ -349,8 +349,10 @@ const Dashboard = ({ session }) => {
               objetivos={dadosFiltrados.objetivos}
             />
           
+            {/* ✅ FIX: Passando os dados do cronograma para o Gantt */}
             <PainelGantt
               fases={dados.fases}
+              cronograma={dados.cronograma} 
               faseSelecionada={faseSelecionada}
               onToggleFase={toggleFase}
             />

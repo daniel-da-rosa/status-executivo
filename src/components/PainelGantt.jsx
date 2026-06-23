@@ -10,50 +10,69 @@ const ORDEM_FASES = [
   'ENCERRAMENTO',
 ];
 
-const PainelGantt = ({ fases, faseSelecionada, onToggleFase }) => {
+const formatarChave = (texto) => String(texto || '').replace(/\s+/g, '').toUpperCase();
+
+const PainelGantt = ({ fases, cronograma, faseSelecionada, onToggleFase }) => {
   const faseAgrupada = React.useMemo(() => {
-    if (!fases || fases.length === 0) return [];
+    const listaFases = fases || [];
+    const listaCrono = cronograma || [];
 
-    const mapa = {};
+    if (listaFases.length === 0 && listaCrono.length === 0) return [];
 
-    fases.forEach((f) => {
-      const nomeFase = f.fase ?? 'SEM FASE';
-      if (nomeFase === 'NÃO PLANEJADO') return;
+    const progressoMap = {};
+    listaFases.forEach((f) => {
+      const nomeOriginal = f.fase ? String(f.fase).trim().toUpperCase() : 'SEM FASE';
+      if (nomeOriginal === 'NÃO PLANEJADO') return;
 
-      if (!mapa[nomeFase]) {
-        mapa[nomeFase] = { total: 0, concluidas: 0, datas: [] };
+      const chaveBlindada = formatarChave(nomeOriginal);
+
+      if (!progressoMap[chaveBlindada]) {
+        progressoMap[chaveBlindada] = { total: 0, concluidas: 0, nomeExibicao: nomeOriginal };
       }
 
-      mapa[nomeFase].total += 1;
+      progressoMap[chaveBlindada].total += 1;
       if (String(f.concluido).toUpperCase() === 'SIM') {
-        mapa[nomeFase].concluidas += 1;
+        progressoMap[chaveBlindada].concluidas += 1;
       }
-
-      if (f.data)    mapa[nomeFase].datas.push(new Date(f.data));
-      if (f.datafim) mapa[nomeFase].datas.push(new Date(f.datafim));
     });
 
-    const ordenadas = ORDEM_FASES.filter((nome) => mapa[nome]);
-    const extras    = Object.keys(mapa).filter((nome) => !ORDEM_FASES.includes(nome));
+    const cronoMap = {};
+    listaCrono.forEach((c) => {
+      if (c.etapa) {
+        const chaveBlindada = formatarChave(c.etapa);
+        cronoMap[chaveBlindada] = {
+          inicio: c.data_inicio,
+          fim: c.data_fim
+        };
+      }
+    });
 
-    return [...ordenadas, ...extras].map((nome) => {
-      const { total, concluidas, datas } = mapa[nome];
+    const todasAsFasesSet = new Set([...Object.keys(progressoMap), ...Object.keys(cronoMap)]);
+    
+    const fasesOrdenadas = ORDEM_FASES.map(formatarChave).filter(chave => todasAsFasesSet.has(chave));
+    const fasesExtras = Array.from(todasAsFasesSet).filter(chave => !ORDEM_FASES.map(formatarChave).includes(chave));
+    const chavesFinais = [...fasesOrdenadas, ...fasesExtras];
+
+    return chavesFinais.map((chave) => {
+      const { total, concluidas, nomeExibicao } = progressoMap[chave] || { total: 0, concluidas: 0, nomeExibicao: chave };
       const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
 
-      const datesValidas = datas.filter((d) => !isNaN(d));
-      const dataInicio   = datesValidas.length > 0 ? new Date(Math.min(...datesValidas)) : null;
-      const dataFim      = datesValidas.length > 0 ? new Date(Math.max(...datesValidas)) : null;
+      const datas = cronoMap[chave] || {};
+      const dataInicio = datas.inicio ? new Date(datas.inicio) : null;
+      const dataFim = datas.fim ? new Date(datas.fim) : null;
 
-      const periodo = dataInicio && dataFim
+      const periodo = dataInicio && !isNaN(dataInicio) && dataFim && !isNaN(dataFim)
         ? `${dataInicio.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} – ${dataFim.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}`
         : '';
 
       const cor   = pct === 100 ? '#2ecc71' : pct > 0 ? '#3498db' : '#e67e22';
       const icone = pct === 100 ? '✓' : pct > 0 ? '◑' : '';
 
-      return { nome, periodo, largura: Math.max(pct, 4), cor, icone, pct };
+      const nomeFinal = ORDEM_FASES.find(of => formatarChave(of) === chave) || nomeExibicao;
+
+      return { nome: nomeFinal, periodo, largura: Math.max(pct, 4), cor, icone, pct, chave };
     });
-  }, [fases]);
+  }, [fases, cronograma]);
 
   const temFiltro = !!onToggleFase;
 
@@ -95,34 +114,65 @@ const PainelGantt = ({ fases, faseSelecionada, onToggleFase }) => {
               background:      isAtivo ? 'rgba(100,255,218,0.06)' : 'transparent',
               outline:         isAtivo ? '1px solid rgba(100,255,218,0.25)' : 'none',
               transition:      'opacity 0.25s ease, background 0.25s ease, outline 0.25s ease',
-              marginBottom:    2,
+              marginBottom:    6,
             }}
           >
-            <div className="gantt-label">
-              <span style={{ fontWeight: isAtivo ? 700 : 400 }}>{fase.nome}</span>
-              <span style={{ color: fase.cor, fontSize: '11px' }}>{fase.periodo}</span>
+            <div className="gantt-label" style={{ marginBottom: '4px' }}>
+              <span style={{ fontWeight: isAtivo ? 700 : 500, fontSize: '12px' }}>{fase.nome}</span>
             </div>
-            <div className="gantt-bar-wrap">
+            
+            <div className="gantt-bar-wrap" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <div
                 className="gantt-bar"
                 style={{
                   width:      `${fase.largura}%`,
-                  background: isAtivo ? fase.cor : fase.cor,
+                  background: fase.cor,
                   color:      '#fff',
-                  minWidth:   '20px',
-                  // pulso suave quando ativo
+                  minWidth:   '45px',
+                  minHeight:  '24px',
+                  borderRadius: '4px',
                   boxShadow:  isAtivo ? `0 0 8px ${fase.cor}88` : 'none',
-                  transition: 'box-shadow 0.25s ease',
+                  transition: 'box-shadow 0.25s ease, width 0.3s ease',
+                  display:    'flex',
+                  alignItems: 'center',
+                  padding:    '0 8px',
+                  position:   'relative',
+                  overflow:   'visible',
                 }}
               >
-                {fase.icone} {fase.pct > 0 ? `${fase.pct}%` : ''}
+                
+                {/* ── LÓGICA DE POSIÇÃO DINÂMICA E SEGURA ── */}
+                {fase.pct >= 45 ? (
+                  <>
+                    {/* MAIOR QUE 45%: Prazo na ESQUERDA, Percentual empurrado para a DIREITA */}
+                    <span style={{ fontSize: '11px', fontWeight: 500, color: '#fff', whiteSpace: 'nowrap' }}>
+                      {fase.periodo}
+                    </span>
+                    <span style={{ fontWeight: 600, fontSize: '12px', whiteSpace: 'nowrap', marginLeft: 'auto' }}>
+                      {fase.pct}% {fase.icone}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {/* MENOR QUE 45%: Percentual DENTRO na ESQUERDA, Prazo FORA na DIREITA */}
+                    <span style={{ fontWeight: 600, fontSize: '12px', whiteSpace: 'nowrap', zIndex: 2 }}>
+                      {fase.icone} {fase.pct}%
+                    </span>
+                    {fase.periodo && (
+                      <span style={{ position: 'absolute', left: '100%', marginLeft: '8px', fontSize: '11px', fontWeight: 500, color: '#8b949e', whiteSpace: 'nowrap', zIndex: 1 }}>
+                        {fase.periodo}
+                      </span>
+                    )}
+                  </>
+                )}
+
               </div>
             </div>
           </div>
         );
       })}
-
-      <div className="milestone-legend">
+      
+      <div className="milestone-legend" style={{ marginTop: '12px' }}>
         <div className="ml-item"><span style={{ color: '#2ecc71' }}>✓</span> Concluído</div>
         <div className="ml-item"><span style={{ color: '#3498db' }}>◑</span> Em andamento</div>
         <div className="ml-item"><span style={{ color: '#e67e22' }}>⚠</span> Pendente</div>

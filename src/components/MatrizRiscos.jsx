@@ -28,7 +28,7 @@ const MatrizRiscos = ({ riscos, areaSelecionada, onToggleArea }) => {
   const cells = Array.from({ length: 9 }, () => []);
 
   (riscos || []).forEach((r) => {
-    const prob = parseInt(r.probabilidade ?? r.probalidade ?? r.prob ?? 0, 10);
+    const prob = parseInt(r.probabilidade ?? r.probabilidade ?? r.prob ?? 0, 10);
     const imp  = parseInt(r.impacto      ?? r.imp                  ?? 0, 10);
 
     // Banco usa escala 1-3. Normaliza para 0-2 para calcular o indice da celula.

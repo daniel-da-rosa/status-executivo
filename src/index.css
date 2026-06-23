@@ -50,8 +50,19 @@
   }
 }
 
+/* ─── INDEX.CSS / GLOBAL.CSS ────────────────────────────── */
+
 body {
   margin: 0;
+  padding: 0;
+  background-color: #08101c;
+  /* Cria uma malha quadriculada muito discreta */
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  /* Tamanho dos quadrados (altere para 30px ou 40px se quiser maiores) */
+  background-size: 24px 24px;
+  background-attachment: fixed;
 }
 
 #root {

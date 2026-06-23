@@ -255,14 +255,14 @@ export default function Login() {
         {/* RIGHT — form */}
         <div style={{ width: '320px', flexShrink: 0, background: '#112240', padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-            <img
+            <img marginTop="20px"
               src={logo}
               alt="Iniflex Status"
               onError={e => {
                 e.target.style.display = 'none';
                 e.target.nextSibling.style.display = 'flex';
               }}
-              style={{ maxWidth: '160px', maxHeight: '60px', objectFit: 'contain', margin: '0 auto', display: 'block' }}
+              style={{ maxWidth: '280px', maxHeight: '120px', objectFit: 'contain', margin: '0 auto', display: 'block' }}
             />
             {/* Fallback — shown only if image fails to load */}
             <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
