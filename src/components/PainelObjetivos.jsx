@@ -51,9 +51,9 @@ const resolverStatus = (valor) => {
 
 // Fallback quando nao ha dados do banco
 const OBJETIVOS_FALLBACK = [
-  { icone: 'estoque',    objetivo: 'ACURACIA DE ESTOQUE',     descricao: 'Atingir mais de 70% de precisao no inventario.',  status: 'Em andamento' },
-  { icone: 'custo',      objetivo: 'APURACAO CUSTO REAL',     descricao: 'Automacao completa do calculo de custos reais.',   status: 'Pendente'     },
-  { icone: 'banco',      objetivo: 'MODERNIZACAO FINANCEIRA', descricao: 'Integracao bancaria via VAN para pagamentos.',     status: 'Pendente'     },
+  { icone: 'estoque',    objetivo: 'ACURACIA DE ESTOQUE',     descricao: 'Atingir mais de 70% de precisao no inventario.',  status: 'pendente' },
+  { icone: 'custo',      objetivo: 'APURACAO CUSTO REAL',     descricao: 'Automacao completa do calculo de custos reais.',   status: 'Iniciado'     },
+  { icone: 'banco',      objetivo: 'MODERNIZACAO FINANCEIRA', descricao: 'Integracao bancaria via VAN para pagamentos.',     status: 'Concluido'     },
 ];
 
 const PainelObjetivos = ({ objetivos }) => {
