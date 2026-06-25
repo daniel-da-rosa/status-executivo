@@ -9,6 +9,7 @@ import PainelObjetivos  from './PainelObjetivos';
 import Timeline         from './Timeline';
 import MatrizRiscos     from './MatrizRiscos';
 import TabelaAreas      from './TabelaAreas';
+import AdminPanel       from './AdminPanel'; // Importação do novo componente admin
 
 const getIniciais = (email = '') => {
   const partes = email.split('@')[0].split(/[._-]/);
@@ -36,10 +37,11 @@ const Dashboard = ({ session }) => {
   const [carregando,      setCarregando]      = useState(false);
   const [erro,            setErro]            = useState(null);
 
-  // ── dois filtros independentes ──────────────────────────────────
+  // Controle de tela ativa: 'dashboard' ou 'admin'
+  const [telaAtiva,       setTelaAtiva]       = useState('dashboard');
+
   const [areaSelecionada, setAreaSelecionada] = useState(null);
   const [faseSelecionada, setFaseSelecionada] = useState(null);
-  // ───────────────────────────────────────────────────────────────
 
   const [menuAberto,  setMenuAberto]  = useState(false);
   const [avatarAberto, setAvatarAberto] = useState(false);
@@ -57,7 +59,6 @@ const Dashboard = ({ session }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Lista de projetos ────────────────────────────────────────────
   const buscarListaProjetos = async () => {
     const { data, error } = await supabase.from('projetos').select('projeto, cliente');
     if (error) {
@@ -73,16 +74,23 @@ const Dashboard = ({ session }) => {
 
   useEffect(() => { buscarListaProjetos(); }, []);
 
-  // ── Dados do projeto ─────────────────────────────────────────────
   const carregarDadosDashboard = async () => {
     setCarregando(true);
     setAreaSelecionada(null);
     setFaseSelecionada(null);
     try {
-      // ✅ BUSCANDO O CRONOGRAMA JUNTO
-      const [projRes, fasesRes, riscosRes, pontosRes, areasRes, objRes, progressoRes, cronoRes] = await Promise.all([
-        supabase.from('projetos').select('*').eq('projeto', projetoAtivo).single(),
-        supabase.from('fases').select('*').eq('projeto_vinculo', projetoAtivo),
+      // 1. Busca os projetos sem o .single() para evitar erro de duplicidade
+      const { data: projData, error: projErr } = await supabase
+        .from('projetos')
+        .select('*')
+        .eq('projeto', projetoAtivo);
+
+      if (projErr) throw projErr;
+      const projetoAtual = projData[0]; // Pega sempre o primeiro encontrado
+
+      // 2. Busca o restante
+      const [fasesRes, riscosRes, pontosRes, areasRes, objRes, progressoRes, cronoRes] = await Promise.all([
+        supabase.from('fases').select('*').eq('projeto_vinculo', projetoAtivo).eq('escopo','SIM'),
         supabase.from('riscos').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('pontos_atencao').select('*').eq('projeto_vinculo', projetoAtivo),
         supabase.from('areas').select('*').eq('projeto_vinculo', projetoAtivo),
@@ -91,8 +99,7 @@ const Dashboard = ({ session }) => {
         supabase.from('cronograma').select('*').eq('projeto_vinculo', projetoAtivo), 
       ]);
 
-      if (projRes.error) throw projRes.error;
-
+      // Mapeamento dos dados...
       const progressoMap = {};
       (progressoRes.data || []).forEach(p => { progressoMap[p.area] = p; });
 
@@ -102,20 +109,18 @@ const Dashboard = ({ session }) => {
         status:    progressoMap[a.area]?.status    ?? a.status,
       }));
 
-      const riscosComTipo    = (riscosRes.data  || []).map(r => ({ ...r, _tipo: 'risco' }));
-      const pontosComTipo    = (pontosRes.data   || []).map(p => ({ ...p, _tipo: 'ponto_atencao' }));
-
       setDados({
-        ...projRes.data,
+        ...projetoAtual,
         fases:      fasesRes.data  || [],
-        riscos:     [...riscosComTipo, ...pontosComTipo],
+        riscos:     [...(riscosRes.data || []).map(r => ({...r, _tipo: 'risco'})), 
+                     ...(pontosRes.data || []).map(p => ({...p, _tipo: 'ponto_atencao'}))],
         areas:      areasMescladas,
         objetivos:  objRes.data    || [],
-        cronograma: cronoRes.data  || [], // ✅ SALVANDO CRONOGRAMA NO ESTADO
+        cronograma: cronoRes.data  || [],
       });
     } catch (err) {
-      console.error(err);
-      toast.error("Não encontramos dados para este projeto.");
+      console.error("ERRO DETALHADO:", err);
+      toast.error("Erro ao carregar projeto. Verifique o console.");
     } finally {
       setCarregando(false);
     }
@@ -123,7 +128,6 @@ const Dashboard = ({ session }) => {
 
   useEffect(() => { if (projetoAtivo) carregarDadosDashboard(); }, [projetoAtivo]);
 
-  // ── Import ───────────────────────────────────────────────────────
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -139,6 +143,7 @@ const Dashboard = ({ session }) => {
       toast.success(result.mensagem || "Importado com sucesso!", { id: tId });
       await buscarListaProjetos();
       setProjetoAtivo(result.projeto);
+      setTelaAtiva('dashboard'); // Força a volta ao dashboard após importar
     } catch {
       toast.error("Erro no servidor Python. Verifique o terminal.", { id: tId });
     } finally {
@@ -146,7 +151,6 @@ const Dashboard = ({ session }) => {
     }
   };
 
-  // ── Handlers de filtro ───────────────────────────────────────────
   const toggleArea = (area) => {
     setAreaSelecionada(prev => prev === area ? null : area);
     setFaseSelecionada(null);
@@ -157,7 +161,6 @@ const Dashboard = ({ session }) => {
     setAreaSelecionada(null);
   };
 
-  // ── Dados filtrados ──────────────────────────────────────────────
   const dadosFiltrados = useMemo(() => {
     if (!dados) return null;
 
@@ -187,7 +190,6 @@ const Dashboard = ({ session }) => {
     return dados;
   }, [dados, areaSelecionada, faseSelecionada]);
 
-  // ── Render ───────────────────────────────────────────────────────
   if (erro) return <div style={{ padding: 20, color: 'red' }}>⚠️ {erro}</div>;
 
   const iniciais    = getIniciais(session?.user?.email);
@@ -205,7 +207,7 @@ const Dashboard = ({ session }) => {
   return (
     <div className="db-root">
 
-      {/* ══ HEADER ══════════════════════════════════════════════════ */}
+      {/* Cabeçalho */}
       <div style={{
         display: 'flex', alignItems: 'center',
         padding: '0 20px', background: '#112240',
@@ -215,8 +217,6 @@ const Dashboard = ({ session }) => {
 
         {/* Esquerda */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-
-          {/* Avatar */}
           <div ref={avatarRef} style={{ position: 'relative' }}>
             <button
               onClick={() => { setAvatarAberto(p => !p); setMenuAberto(false); }}
@@ -253,10 +253,9 @@ const Dashboard = ({ session }) => {
             )}
           </div>
 
-          {/* Select de projeto */}
           <select
             value={projetoAtivo}
-            onChange={e => setProjetoAtivo(e.target.value)}
+            onChange={e => { setProjetoAtivo(e.target.value); setTelaAtiva('dashboard'); }}
             style={{
               background: '#0a192f', color: '#fff',
               border: '1px solid #2a5298', borderRadius: '6px',
@@ -270,7 +269,7 @@ const Dashboard = ({ session }) => {
             ))}
           </select>
 
-          {/* Menu ⋮ */}
+          {/* Menu com as duas opções solicitadas */}
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => { setMenuAberto(p => !p); setAvatarAberto(false); }}
@@ -284,26 +283,39 @@ const Dashboard = ({ session }) => {
                 position: 'absolute', top: '40px', left: 0, zIndex: 300,
                 background: '#112240', border: '1px solid #233554',
                 borderRadius: '8px', padding: '6px',
-                minWidth: '180px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
               }}>
                 <input ref={fileRef} type="file" id="file-up" style={{ display: 'none' }} onChange={handleImport} accept=".xlsx,.xls" />
+                
                 <label htmlFor="file-up" style={itemStyle} onMouseEnter={onHover} onMouseLeave={offHover}>
                   📥 Importar planilha
                 </label>
+
+                <button
+                  onClick={() => {
+                    setTelaAtiva(telaAtiva === 'dashboard' ? 'admin' : 'dashboard');
+                    setMenuAberto(false);
+                  }}
+                  style={itemStyle}
+                  onMouseEnter={onHover}
+                  onMouseLeave={offHover}
+                >
+                  {telaAtiva === 'dashboard' ? 'Gerenciar dados (Admin)' : 'Voltar para o Dashboard'}
+                </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Centro */}
+        {/* Centro - Título dinâmico baseado na tela visível */}
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#64ffda', lineHeight: 1.2 }}>
-            {dados?.projeto ? `PROJETO: ${dados.projeto}` : 'SELECIONE UM PROJETO'}
+            {telaAtiva === 'admin' ? 'PAINEL ADMINISTRATIVO' : dados?.projeto ? `PROJETO: ${dados.projeto}` : 'SELECIONE UM PROJETO'}
           </div>
           <div style={{ fontSize: '13px', color: '#8892b0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <span>{dados?.cliente ?? '—'} · {new Date().toLocaleDateString('pt-BR')}</span>
 
-            {filtroAtivo && (
+            {filtroAtivo && telaAtiva === 'dashboard' && (
               <span
                 onClick={filtroAtivo.limpar}
                 title="Clique para limpar o filtro"
@@ -322,7 +334,7 @@ const Dashboard = ({ session }) => {
           </div>
         </div>
 
-        {/* Direita — usa sempre dados globais */}
+        {/* Direita */}
         <div style={{
           flexShrink: 0,
           background: 'rgba(100,255,218,0.05)', padding: '8px 16px',
@@ -334,10 +346,14 @@ const Dashboard = ({ session }) => {
           <div style={{ color: '#8892b0' }}>Horas: <span style={{ color: '#e2eaf5' }}>{dados?.horas_utilizada ?? 0} / {dados?.horas_contrato ?? 0}</span></div>
         </div>
       </div>
-      {/* ═══════════════════════════════════════════════════════════ */}
 
-      {/* CONTEÚDO */}
-      {carregando ? (
+      {/* Área de Conteúdo Condicional */}
+      {telaAtiva === 'admin' ? (
+        <AdminPanel 
+          onBack={() => setTelaAtiva('dashboard')} 
+          projetoAtivo={projetoAtivo} 
+        />
+      ) : carregando ? (
         <div style={{ padding: '100px', textAlign: 'center', color: '#64ffda' }}>Sincronizando dados...</div>
       ) : dadosFiltrados ? (
         <div style={{ padding: '20px' }}>
@@ -348,8 +364,6 @@ const Dashboard = ({ session }) => {
               horasTotais={dados.horas_contrato ?? 0}
               objetivos={dadosFiltrados.objetivos}
             />
-          
-            {/* ✅ PASSANDO OS DADOS DO CRONOGRAMA PARA O COMPONENTE */}
             <PainelGantt
               fases={dados.fases}
               cronograma={dados.cronograma} 
